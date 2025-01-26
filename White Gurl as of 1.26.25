@@ -1,0 +1,71 @@
+import matplotlib.pyplot as plt
+from vpython import *
+import math
+
+g1 = graph(title="linear drag", xtitle="t [s]", ytitle="Position [m]", width=500, height=250)
+f1 = gcurve(color=color.blue)
+f2 = gcurve(color=color.red)
+
+# create empty lists to store time, x, and y values
+t_list = []
+x_list = []
+y_list = []
+z_list = []
+
+# DONT CHANGE ANYTHING HERE (gravity, radius, mass, air density, drag coefficient)
+g = vector(0, -9.8, 0)
+R = (40 / 1000) / 2
+M = 2.75 / 1000
+rho = 1.293
+A = pi * R ** 2
+C = 0.507
+
+# change initial velocity here (if i did a silly and got a wrong value)
+v0 = (40/1000)/0.0030
+# change launch angle here
+theta = 28 * pi / 180
+
+ground = box(pos=vector(0, 0, 0), size=vector(10, 0.5, 2), color=color.green)
+ball = sphere(pos=vector(-(0.7366*(cos(theta))), .09+0.6858*math.sin(theta), 0), radius=2 * R, make_trail=True, color=color.red)
+ball.m = M
+ball.p = ball.m * v0 * vector(cos(theta), sin(theta), 0)
+t = 0
+dt = 0.005
+
+while ball.pos.y > 0:
+    rate(100)
+    ball.v = ball.p / ball.m
+    F = ball.m * g - .5 * rho * A * C * mag(ball.v) ** 2 * norm(ball.v)
+    ball.p = ball.p + F * dt
+    ball.pos = ball.pos + ball.p * dt / ball.m
+
+    # append time, x, and y values to the respective lists
+    t_list.append(t)
+    x_list.append(ball.pos.x)
+    y_list.append(ball.pos.y)
+    z_list.append(1)
+
+    #Graph plots
+    f1.plot(t, ball.pos.x)
+    f2.plot(t, ball.pos.y)
+    t = t + dt
+
+print("final position = ", ball.pos, "m")
+print("Time = ", t, " s")
+
+# plot graph using matplotlib (saves to local)
+plt.plot(t_list, y_list, color='red', label='y')
+plt.xlabel('t [s]')
+plt.ylabel('y [m]')
+
+plt.plot(t_list, z_list, color='green', label='meter')
+
+plt.plot(t_list, x_list, color='blue', label='x')
+plt.xlabel('t [s]')
+plt.ylabel('x [m]')
+plt.legend()
+plt.show()
+
+
+
+
