@@ -6,9 +6,9 @@ import numpy as np
 # ==============================================
 
 # ball properties
-BALL_DIAMETER = 51.5 / 1000  # meters
-BALL_MASS = 24 / 1000    # kg
-INITIAL_VELOCITY = BALL_DIAMETER/0.0052  # m/s
+BALL_DIAMETER = 49.2 / 1000  # meters
+BALL_MASS = 27 / 1000    # kg
+INITIAL_VELOCITY = BALL_DIAMETER/0.0047  # m/s
 
 # environment properties
 AIR_DENSITY = 1.225        # kg/m³
@@ -16,9 +16,9 @@ GRAVITY = 9.8              # m/s²
 DRAG_COEFFICIENT = 0.55    # no dimension
 
 # barrel properties
-BARREL_LENGTH = 0.62       # meters
+BARREL_LENGTH = 0.66      # meters
 BARREL_HEIGHT = 0.06       # meters
-BALL_START_POSITION = 0.6  # meters
+BALL_START_POSITION = 0.63  # meters
 
 # simulation
 TIME_STEP = 0.001          # seconds (reduced for better accuracy)
@@ -61,7 +61,7 @@ def simulate_trajectory(theta, target_x, target_y, show_path=False):
     g = vector(0, -GRAVITY, 0)
     
     initial_x = -(BARREL_LENGTH * cos(theta))
-    initial_y = BARREL_HEIGHT + BALL_START_POSITION * sin(theta)
+    initial_y = BARREL_HEIGHT + (BALL_START_POSITION * sin(theta))
     
     if show_path:
         ball = sphere(
