@@ -1,0 +1,197 @@
+from vpython import *
+import math
+import numpy as np
+
+# CONFIGURABLE PARAMETERS
+# ==============================================
+
+# ball properties
+BALL_DIAMETER = 5.715 / 100  # meters
+BALL_MASS = 40 / 1000    # kg
+INITIAL_VELOCITY = BALL_DIAMETER/0.0056  # m/s
+
+# environment properties
+AIR_DENSITY = 1.225        # kg/m³
+GRAVITY = 9.8              # m/s²
+DRAG_COEFFICIENT = 0.55    # no dimension
+
+# barrel properties
+BARREL_LENGTH = 0.405      # meters
+BARREL_HEIGHT = 0.125       # meters
+BALL_START_POSITION = 0.59   # meters
+
+# simulation
+TIME_STEP = 0.001          # seconds (reduced for better accuracy)
+SIMULATION_RATE = 100      # frames per second
+TARGET_TOLERANCE = 0    # meters 
+
+# scene setup
+SCENE_WIDTH = 1500
+SCENE_HEIGHT = 800
+GROUND_SIZE = vector(20, 0.1, 4)  
+
+def create_environment():
+    """Creates basic visual environment"""
+    ground = box(pos=vector(GROUND_SIZE.x/2, 0, 0), 
+                size=GROUND_SIZE, 
+                color=color.green)
+
+def create_target_platform(x, y):
+    """Creates a target platform"""
+    platform_width = 0.5
+    platform_height = 0.1
+    platform_depth = 0.5
+    
+    # Create main platform
+    platform = box(pos=vector(x, y - platform_height/2, 0),
+                  size=vector(platform_width, platform_height, platform_depth),
+                  color=color.red)
+    
+    # Add support column
+    if y > platform_height:
+        support = cylinder(pos=vector(x, 0, 0),
+                         axis=vector(0, y - platform_height, 0),
+                         radius=platform_width/6,
+                         color=color.gray(0.7))
+
+def simulate_trajectory(theta, target_x, target_y, show_path=False):
+    """Simulates projectile motion with air resistance"""
+    R = BALL_DIAMETER / 2
+    A = pi * R ** 2
+    g = vector(0, -GRAVITY, 0)
+    
+    initial_x = -(BARREL_LENGTH * cos(theta))
+    initial_y = BARREL_HEIGHT + (BALL_START_POSITION * sin(theta))
+    
+    if show_path:
+        ball = sphere(
+            pos=vector(initial_x, initial_y, 0),
+            radius=R,
+            make_trail=True,
+            trail_type="curve",
+            trail_radius=R/3,
+            color=color.cyan
+        )
+            
+    pos = vector(initial_x, initial_y, 0)
+    prev_pos = vector(pos.x, pos.y, pos.z)
+    p = BALL_MASS * INITIAL_VELOCITY * vector(cos(theta), sin(theta), 0)
+    
+    t = 0
+    dt = TIME_STEP
+    min_dist_to_target = float('inf')
+    hit_target = False
+    hit_position = None
+    
+    while pos.y >= 0:
+        if show_path:
+            rate(SIMULATION_RATE)
+            ball.pos = pos
+            
+        # Check distance to target
+        dist_to_target = mag(vector(pos.x - target_x, pos.y - target_y, 0))
+        
+        # if we're close to target height and have crossed target x
+        if (abs(pos.y - target_y) < TARGET_TOLERANCE and 
+            ((prev_pos.x <= target_x and pos.x >= target_x) or 
+             (prev_pos.x >= target_x and pos.x <= target_x))):
+            hit_target = True
+            hit_position = vector(pos.x, pos.y, pos.z)
+            if not show_path:  # If not showing path, we can break early
+                break
+            
+        min_dist_to_target = min(min_dist_to_target, dist_to_target)
+        
+        prev_pos = vector(pos.x, pos.y, pos.z)
+        v = p / BALL_MASS
+        F = BALL_MASS * g - .5 * AIR_DENSITY * A * DRAG_COEFFICIENT * mag(v) ** 2 * norm(v)
+        p = p + F * dt
+        pos = pos + p * dt / BALL_MASS
+        t += dt
+    
+    if show_path:
+        print(f"Angle: {degrees(theta):.1f}°")
+        print(f"Time: {t:.3f}s")
+        if hit_position:
+            print(f"Hit target at: ({hit_position.x:.3f}m, {hit_position.y:.3f}m)")
+        print(f"Landing: ({pos.x:.3f}m, 0m)\n")
+        
+    return 0 if hit_target else min_dist_to_target
+
+def find_launch_angles(target_x, target_y):
+    """Finds the best launch angles"""
+    angles = []
+    distances = []
+    
+    # Test angles from 5 to 85 degrees with 0.1 degree steps
+    test_angles = np.linspace(5, 85, 801)
+    
+    for angle in test_angles:
+        theta = radians(angle)
+        distance = simulate_trajectory(theta, target_x, target_y)
+        angles.append(theta)
+        distances.append(distance)
+    
+    distances = np.array(distances)
+    sorted_indices = np.argsort(distances)
+    
+    best_angles = []
+    for idx in sorted_indices:
+        angle = degrees(angles[idx])
+        angle = round(angle * 10) / 10
+        
+        if not best_angles:
+            best_angles.append(angle)
+        elif len(best_angles) == 1:
+            if abs(angle - best_angles[0]) > 5:
+                best_angles.append(angle)
+                break
+    
+    return [radians(angle) for angle in sorted(best_angles)]
+
+def main():
+    scene.width = SCENE_WIDTH
+    scene.height = SCENE_HEIGHT
+    scene.background = color.black
+    
+    # Modified camera settings to center on ground
+    scene.camera.pos = vector(GROUND_SIZE.x/2, 3, 10)  # Centered above ground
+    scene.camera.axis = vector(0, -0.3, -1)  # Looking slightly down
+    scene.up = vector(0, 1, 0)
+    
+    # Enable default mouse controls
+    scene.userzoom = True
+    scene.userspin = True
+    
+    # Set initial range
+    scene.range = 8
+    
+    create_environment()
+    
+    target_x = float(input("Enter target distance (in meters): "))
+    target_y = float(input("Enter target height (in meters): "))
+    
+    # Adjust camera based on target distance but maintain centered view
+    if target_x > 8:
+        scene.range = max(8, target_x/2)
+    
+    # Create target platform instead of simple sphere
+    create_target_platform(target_x, target_y)
+    
+    # Clear any existing trails
+    for obj in scene.objects:
+        if isinstance(obj, sphere):
+            obj.visible = False
+    
+    angles = find_launch_angles(target_x, target_y)
+    
+    if len(angles) == 0:
+        print(f"No solution found - target may be out of range")
+    else:
+        print(f"\nBest launch angles to reach target at ({target_x}m, {target_y}m):")
+        for angle in angles:
+            print(f"  {degrees(angle):.1f}°")
+            simulate_trajectory(angle, target_x, target_y, show_path=True)
+
+if __name__ == "__main__":
+    main()
